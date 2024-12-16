@@ -14,9 +14,9 @@ fn main() -> Result<()> {
             Ok(mut stream) => {
                 println!("accepted new connection");
                 let mut buff = [0; 128];
-                stream.read(&mut buff)?;
+                let _ = stream.read(&mut buff)?;
                 let m = Message::from_bytes(&buff);
-                stream.write_all(&m.to_bytes())?;
+                stream.write_all(&m.get_answer().to_bytes())?;
                 stream.flush()?;
             }
             Err(e) => {
@@ -36,10 +36,10 @@ struct Message {
 
 #[derive(Default, Clone, Debug)]
 struct MessageHeader {
-    request_api_key: i16,         //   The API key for the request
+    request_api_key: i16,         // The API key for the request
     request_api_version: i16,     // The version of the API for the request
-    correlation_id: i32,          //A unique identifier for the request
-    client_id: String,            //  NULLABLE_STRING     The client ID for the request
+    correlation_id: i32,          // A unique identifier for the request
+    client_id: String,            // The client ID for the request
     tag_array: CompactBuffer<u8>, // Optional tagged fields
 }
 
@@ -47,6 +47,9 @@ struct MessageHeader {
 struct CompactBuffer<T> {
     array: Vec<T>,
 }
+
+#[derive(Default, Clone, Debug)]
+struct ProduceBody {}
 
 impl Message {
     fn from_bytes(input: &[u8]) -> Self {
@@ -61,12 +64,32 @@ impl Message {
             ..Default::default()
         }
     }
+
     fn to_bytes(self) -> Vec<u8> {
         let mut m = Vec::new();
         m.extend_from_slice(&self.message_size.to_be_bytes());
         m.extend_from_slice(&self.header.to_bytes());
         m.extend_from_slice(&self.body);
         m
+    }
+
+    fn get_answer(self) -> Self {
+        let mut resp = self.clone();
+        match self.header.request_api_key {
+            18 => self.handle_api_versions(&mut resp),
+            0..=81 => {
+                //valid api request_key
+                unimplemented!()
+            }
+            _ => {}
+        }
+        resp
+    }
+
+    fn handle_api_versions(self, resp: &mut Self) {
+        match self.header.request_api_version {
+            _ => resp.body = 35_i16.to_be_bytes().into(), // unsupported api version
+        }
     }
 }
 
@@ -83,3 +106,5 @@ impl<T> CompactBuffer<T> {
         todo!()
     }
 }
+
+impl ProduceBody {}
