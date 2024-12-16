@@ -18,7 +18,8 @@ fn main() -> Result<()> {
                     header: MessageHeader { correlation_id: 7 },
                     body: Vec::new(),
                 };
-                stream.write(&m.to_bytes())?;
+                stream.write_all(&m.to_bytes())?;
+                stream.flush()?;
             }
             Err(e) => {
                 println!("error: {}", e);
